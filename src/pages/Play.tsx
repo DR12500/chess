@@ -7,6 +7,7 @@ import { BOT_MAX, BOT_MIN, BOT_RD, DIFFICULTY_PRESETS, botConfigFor, botTargetFo
 import { analysisEngine } from '../lib/engine';
 import { Color, gameOverReason, playUci, soundFor, toColor } from '../lib/chessUtil';
 import { playSound } from '../lib/sound';
+import { CLASS_INFO, MoveClass } from '../lib/review';
 import { GameRecord, Profile, computeStats, ratingConfigOf, uid } from '../lib/model';
 import { previewChanges } from '../lib/rating';
 import { ColorChoice, addGame, currentProfile, getState, updateSettings, useStore } from '../lib/store';
@@ -466,7 +467,7 @@ export function MoveList({ history, startsWithBlack = false, current, onSelect, 
 }
 
 function markGlyph(m: string) {
-  return { blunder: '??', mistake: '?', inaccuracy: '?!', best: '★' }[m] ?? '';
+  return CLASS_INFO[m as MoveClass]?.glyph ?? '';
 }
 
 const VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };

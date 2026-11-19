@@ -27,7 +27,7 @@ Node is installed at `C:\Program Files\nodejs` (via winget); in Git Bash you may
 - `src/lib/engine.ts`, `src/lib/bot.ts`: Stockfish web-worker wrapper and the opponent
 - `src/lib/model.ts`: synced data model, merge, derived stats (ratings are *replayed* from records, never stored)
 - `src/lib/gist.ts`, `src/lib/store.ts`: GitHub Gist sync, app state (localStorage), React hook
-- `src/lib/review.ts`: game review move classification / accuracy
+- `src/lib/review.ts`: game review: chess.com-style move classes (expected-points bands Best/Excellent ≤.02/Good ≤.05/Inaccuracy ≤.10/Mistake ≤.20/Blunder, plus Book/Great/Brilliant/Miss) and Lichess game accuracy (volatility-weighted + harmonic mean). Review uses a separate full-strength engine at MultiPV 2; never the weakened bot.
 - `src/pages/*`: Home, Play, Review, Puzzles, Learn (lessons + openings), Profile (stats), Settings (+ onboarding)
 - `src/content/lessons.ts`, `src/content/openings.ts`: learning content (validated by `tests/content.test.ts`)
 - `public/puzzles.json`: 3120 puzzles sampled from the Lichess puzzle DB (CC0), 120 per 100-pt band 400–2999; regenerate with `python -I scripts/fetch_puzzles.py public/puzzles.json` (needs `pip install zstandard`)

@@ -4,12 +4,15 @@ import type { Nav } from '../App';
 import { Board } from '../components/Board';
 import { analysisEngine } from '../lib/engine';
 import { Color, toColor, winPercent } from '../lib/chessUtil';
-import { classifyMoves, accuracy, PositionEval, MoveClass } from '../lib/review';
+import { CLASS_INFO, classifyMoves, accuracy, countBookPlies, PositionEval, MoveClass } from '../lib/review';
+import { OPENINGS } from '../content/openings';
 import { computeStats } from '../lib/model';
 import { currentProfile, getState, useStore } from '../lib/store';
 import { MoveList } from './Play';
 
-const cacheKey = (id: string) => `chess.review.${id}`;
+// v2: evaluations include the 2nd-best move (MultiPV 2).
+const cacheKey = (id: string) => `chess.review.v2.${id}`;
+const BOOK_LINES = OPENINGS.map((o) => o.moves.split(' '));
 
 export function ReviewPage({ nav, gameId }: { nav: Nav; gameId: string }) {
   const profile = useStore((s) => currentProfile(s))!;
@@ -42,7 +45,8 @@ export function ReviewPage({ nav, gameId }: { nav: Nav; gameId: string }) {
     let cancelled = false;
     (async () => {
       const eng = analysisEngine();
-      await eng.setOptions({ UCI_LimitStrength: false, 'Skill Level': 20, MultiPV: 1 });
+      await eng.setOptions({ UCI_LimitStrength: false, 'Skill Level': 20, MultiPV: 2 });
+      await eng.newGame();
       const out: PositionEval[] = [];
       for (let i = 0; i < parsed.fens.length; i++) {
         if (cancelled) return;
@@ -53,11 +57,18 @@ export function ReviewPage({ nav, gameId }: { nav: Nav; gameId: string }) {
           out.push({ score: ch.isCheckmate() ? -100000 : 0, best: null });
         } else {
           const r = await eng.search(fen, `depth ${getState().settings.reviewDepth}`);
-          out.push({ score: r.lines[0]?.score ?? 0, best: r.bestmove });
+          const l2 = r.lines[1];
+          out.push({
+            score: r.lines[0]?.score ?? 0,
+            best: r.lines[0]?.pv[0] ?? r.bestmove,
+            second: l2 && l2.pv[0] ? { move: l2.pv[0], score: l2.score } : null,
+          });
         }
         setProgress((i + 1) / parsed.fens.length);
       }
       if (cancelled) return;
+      // Restore single-line mode for hints / draw offers that share this engine.
+      await eng.setOptions({ MultiPV: 1 });
       setEvals(out);
       try {
         localStorage.setItem(cacheKey(gameId), JSON.stringify(out));
@@ -89,9 +100,9 @@ export function ReviewPage({ nav, gameId }: { nav: Nav; gameId: string }) {
     );
   }
 
-  const classes: MoveClass[] | null = evals
-    ? classifyMoves(parsed.hist.map((h) => h.color), evals, parsed.hist.map((h) => h.from + h.to + (h.promotion ?? '')))
-    : null;
+  const plies = parsed.hist.map((h) => ({ uci: h.from + h.to + (h.promotion ?? ''), color: h.color, fenBefore: h.before, san: h.san }));
+  const bookPlies = game.pgn.includes('[FEN') ? 0 : countBookPlies(parsed.hist.map((h) => h.san), BOOK_LINES);
+  const classes: MoveClass[] | null = evals ? classifyMoves(plies, evals, bookPlies) : null;
   const acc = evals ? accuracy(parsed.hist.map((h) => h.color), evals) : null;
   const delta = stats.gameDelta[game.id];
   const fen = parsed.fens[ply + 1];
@@ -106,7 +117,8 @@ export function ReviewPage({ nav, gameId }: { nav: Nav; gameId: string }) {
   const whitePct = winPercent(whiteCp);
 
   const arrows = [];
-  if (cls && cls !== 'best' && cls !== 'good' && bestPrev) arrows.push({ from: bestPrev.slice(0, 2), to: bestPrev.slice(2, 4), color: 'green' as const });
+  const showBest = !!cls && !['best', 'great', 'brilliant', 'book'].includes(cls);
+  if (showBest && bestPrev) arrows.push({ from: bestPrev.slice(0, 2), to: bestPrev.slice(2, 4), color: 'green' as const });
 
   return (
     <div className="game-layout">
@@ -154,9 +166,9 @@ export function ReviewPage({ nav, gameId }: { nav: Nav; gameId: string }) {
         {move && (
           <div className="card">
             <b>{Math.ceil((ply + 1) / 2)}{move.color === 'w' ? '.' : '…'} {move.san}</b>{' '}
-            {cls && <span className={`tag ${cls}`}>{cls}</span>}
+            {cls && <span className={`tag ${cls}`}>{CLASS_INFO[cls].glyph} {CLASS_INFO[cls].label}</span>}
             {curEval && <span className="muted small"> eval {formatEval(whiteCp)}</span>}
-            {cls && cls !== 'best' && cls !== 'good' && bestPrev && prevEval && (
+            {showBest && bestPrev && prevEval && (
               <div className="small">Best was <b>{uciToSan(parsed.fens[ply], bestPrev)}</b> (green arrow).</div>
             )}
           </div>
@@ -171,14 +183,19 @@ export function ReviewPage({ nav, gameId }: { nav: Nav; gameId: string }) {
   );
 }
 
+const SUMMARY_ORDER: MoveClass[] = ['brilliant', 'great', 'best', 'excellent', 'good', 'book', 'inaccuracy', 'mistake', 'miss', 'blunder'];
+
 function Summary({ classes, colors, human }: { classes: MoveClass[]; colors: ('w' | 'b')[]; human: 'w' | 'b' }) {
   const count = (c: MoveClass) => classes.filter((x, i) => x === c && colors[i] === human).length;
   return (
-    <div className="card summary">
-      <span className="tag best">★ best {count('best')}</span>
-      <span className="tag inaccuracy">?! {count('inaccuracy')}</span>
-      <span className="tag mistake">? {count('mistake')}</span>
-      <span className="tag blunder">?? {count('blunder')}</span>
+    <div className="card summary-grid">
+      <div className="muted small">Your moves</div>
+      {SUMMARY_ORDER.map((c) => (
+        <div key={c} className={`sum-row ${count(c) ? '' : 'zero'}`}>
+          <span className={`tag ${c}`}>{CLASS_INFO[c].glyph} {CLASS_INFO[c].label}</span>
+          <b>{count(c)}</b>
+        </div>
+      ))}
     </div>
   );
 }

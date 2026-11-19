@@ -245,3 +245,17 @@ li { margin-bottom: 4px; }
 .setup { margin: 10px 0; }
 .setup summary { cursor: pointer; font-weight: 600; }
 .mt { margin-top: 16px; }
+
+/* ---------- review classifications (chess.com-like colours) ---------- */
+.mark.brilliant, .tag.brilliant { color: #26c2a3; }
+.mark.great, .tag.great { color: #749bbf; }
+.mark.excellent, .tag.excellent { color: #96bc4b; }
+.mark.good, .tag.good { color: #98a86c; }
+.mark.book, .tag.book { color: #a88865; }
+.mark.miss, .tag.miss { color: #ff7769; }
+.mark.book { font-size: 10px; }
+.mark.excellent { font-size: 10px; }
+.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 16px; }
+.summary-grid > .muted { grid-column: 1 / -1; margin-bottom: 4px; }
+.sum-row { display: flex; justify-content: space-between; align-items: center; }
+.sum-row.zero { opacity: 0.4; }
