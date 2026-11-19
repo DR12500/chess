@@ -4,7 +4,8 @@ import type { Nav } from '../App';
 import { Board } from '../components/Board';
 import { LESSONS, LEVELS, Level, Step } from '../content/lessons';
 import { OPENINGS } from '../content/openings';
-import { playSound, playUci, toColor } from '../lib/chessUtil';
+import { playUci, toColor } from '../lib/chessUtil';
+import { playSound } from '../lib/sound';
 import { computeStats } from '../lib/model';
 import { currentProfile, markLessonDone, useStore } from '../lib/store';
 
@@ -104,7 +105,6 @@ export function LessonPage({ nav, id }: { nav: Nav; id: string }) {
 
 /** Board for a lesson step: static diagram, interactive task (`line`) or demo (`demo`). */
 function StepBoard({ step, onSolved }: { step: Step; onSolved: () => void }) {
-  const sound = useStore((s) => s.settings.sound);
   const seq = step.line ?? step.demo ?? [];
   const [ply, setPly] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
@@ -132,10 +132,10 @@ function StepBoard({ step, onSolved }: { step: Step; onSolved: () => void }) {
     if (!playUci(test, uci)) return;
     const expected = seq[ply];
     if (uci === expected || (step.anyMate && test.isCheckmate())) {
-      playSound(test.inCheck() ? 'check' : 'move', sound);
+      playSound(test.inCheck() ? 'check' : 'move');
       if (ply + 1 >= seq.length) {
         setMsg('Correct! ✅');
-        playSound('good', sound);
+        playSound('good');
         onSolved();
         if (uci !== expected) {
           // Accepted alternative mate: show the position the user actually reached.
@@ -144,7 +144,7 @@ function StepBoard({ step, onSolved }: { step: Step; onSolved: () => void }) {
       } else setMsg('Good, keep going…');
       setPly(ply + 1);
     } else {
-      playSound('bad', sound);
+      playSound('bad');
       setMsg('Not this one. Try again.');
       setTick((t) => t + 1);
     }

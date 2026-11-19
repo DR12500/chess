@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { activeProfiles, computeStats } from './lib/model';
-import { currentProfile, syncNow, updateSettings, useStore } from './lib/store';
+import { connectSync, currentProfile, parseSyncCode, syncNow, updateSettings, useStore } from './lib/store';
+import { applyUpdate, usePwa } from './lib/pwa';
 import { HomePage } from './pages/Home';
 import { PlayPage } from './pages/Play';
 import { ReviewPage } from './pages/Review';
@@ -39,16 +40,45 @@ export function App() {
   const boardTheme = useStore((s) => s.settings.boardTheme);
   const stats = useMemo(() => (profile ? computeStats(profile) : null), [profile]);
 
+  const pwa = usePwa();
+  const [linkMsg, setLinkMsg] = useState<string | null>(null);
+
   useEffect(() => {
+    // Opened via a sync link / QR code (…#sync=token:gist): connect this device.
+    if (location.hash.startsWith('#sync=')) {
+      const code = parseSyncCode(location.hash);
+      history.replaceState(null, '', location.pathname + location.search);
+      if (confirm('Connect this device to your Chess Trainer sync?')) {
+        setLinkMsg('Connecting sync…');
+        connectSync(code).then(
+          () => setLinkMsg('Sync connected ✓'),
+          (e: Error) => setLinkMsg(`Sync failed: ${e.message}`),
+        );
+        return;
+      }
+    }
     void syncNow();
   }, []);
+
+  const banners = (
+    <>
+      {pwa.updateAvailable && (
+        <div className="banner">
+          A new version is available. <button className="btn primary small" onClick={applyUpdate}>Update now</button>
+        </div>
+      )}
+      {linkMsg && (
+        <div className="banner" onClick={() => setLinkMsg(null)}>{linkMsg}</div>
+      )}
+    </>
+  );
 
   const nav: Nav = (r) => {
     setRoute(r);
     window.scrollTo(0, 0);
   };
 
-  if (!profile) return <Onboarding />;
+  if (!profile) return <>{banners}<Onboarding /></>;
 
   const active = route.name === 'review' ? 'profile' : route.name === 'lesson' || route.name === 'opening' ? 'learn' : route.name;
 
@@ -82,6 +112,7 @@ export function App() {
           <span className="rating-chip">{stats ? Math.round(stats.game.rating) + (stats.provisional ? '?' : '') : ''}</span>
         </div>
       </header>
+      {banners}
       <main className="main">
         {route.name === 'home' && <HomePage nav={nav} />}
         {route.name === 'play' && <PlayPage key={profile.id + (route.startMoves ?? '')} nav={nav} startMoves={route.startMoves} forcedColor={route.color} />}

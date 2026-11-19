@@ -228,3 +228,20 @@ li { margin-bottom: 4px; }
   .game-layout { flex-direction: row; }
   .board-col { max-width: calc(100vh - 110px); }
 }
+
+/* ---------- v2 additions ---------- */
+.banner { background: #3b4a2c; color: var(--text); padding: 10px 16px; display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; font-weight: 600; }
+.qr { background: #fff; border-radius: 8px; padding: 4px; }
+.center { text-align: center; align-items: center; }
+.scanner { max-width: 480px; }
+.scanner-video { width: 100%; border-radius: 10px; background: #000; margin: 8px 0; aspect-ratio: 1 / 1; object-fit: cover; }
+.slider { margin: 8px 0 12px; }
+.slider-head { display: flex; justify-content: space-between; }
+.slider input { margin: 6px 0 2px; }
+.toggle-row { padding: 6px 0; }
+.install { border: 1px solid var(--accent-dark); }
+.install-help { background: var(--bg3); border-radius: 8px; padding: 4px 12px; margin-top: 8px; }
+.kbd { background: var(--bg); border-radius: 4px; padding: 0 6px; }
+.setup { margin: 10px 0; }
+.setup summary { cursor: pointer; font-weight: 600; }
+.mt { margin-top: 16px; }

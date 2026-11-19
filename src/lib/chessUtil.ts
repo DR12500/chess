@@ -52,29 +52,6 @@ export function winPercent(cp: number): number {
   return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * c)) - 1);
 }
 
-// ---------- sounds (generated, no audio files) ----------
-let ctx: AudioContext | null = null;
-export function playSound(kind: 'move' | 'capture' | 'check' | 'end' | 'good' | 'bad', enabled = true) {
-  if (!enabled) return;
-  try {
-    ctx ??= new AudioContext();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    const f = { move: 520, capture: 380, check: 760, end: 300, good: 880, bad: 200 }[kind];
-    o.frequency.value = f;
-    o.type = kind === 'capture' ? 'triangle' : 'sine';
-    const t = ctx.currentTime;
-    const dur = kind === 'end' || kind === 'good' || kind === 'bad' ? 0.35 : 0.08;
-    g.gain.setValueAtTime(0.18, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g).connect(ctx.destination);
-    o.start(t);
-    o.stop(t + dur);
-  } catch {
-    /* audio not available */
-  }
-}
-
 export function soundFor(m: Move, chess: Chess): 'move' | 'capture' | 'check' {
   if (chess.inCheck()) return 'check';
   return m.captured ? 'capture' : 'move';

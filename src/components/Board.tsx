@@ -6,6 +6,7 @@ import type { DrawShape } from 'chessground/draw';
 import type { Key } from 'chessground/types';
 import { Chess } from 'chess.js';
 import { Color, checkColor, dests, isPromotion, toColor } from '../lib/chessUtil';
+import { useStore } from '../lib/store';
 
 export interface BoardProps {
   fen: string;
@@ -39,6 +40,9 @@ export function Board({ fen, orientation, movable, lastMove, arrows, highlight, 
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
   const [promo, setPromo] = useState<{ from: string; to: string; color: Color } | null>(null);
+  const prefs = useStore((s) => s.settings);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
 
   const config = (): Config => {
     const chess = new Chess(fen);
@@ -56,10 +60,13 @@ export function Board({ fen, orientation, movable, lastMove, arrows, highlight, 
         free: false,
         color: canMove ? turn : undefined,
         dests: canMove ? (dests(chess) as Map<Key, Key[]>) : new Map(),
-        showDests: true,
+        showDests: prefs.showDests,
         events: {
           after: (from, to) => {
-            if (isPromotion(new Chess(fen), from, to)) setPromo({ from, to, color: turn });
+            if (isPromotion(new Chess(fen), from, to)) {
+              if (prefsRef.current.autoQueen) onMoveRef.current?.(from + to + 'q');
+              else setPromo({ from, to, color: turn });
+            }
             else onMoveRef.current?.(from + to);
           },
         },
@@ -67,22 +74,22 @@ export function Board({ fen, orientation, movable, lastMove, arrows, highlight, 
       drawable: { enabled: true, autoShapes: shapes },
       premovable: { enabled: false },
       highlight: { lastMove: true, check: true },
-      animation: { enabled: true, duration: 180 },
+      animation: { enabled: prefs.animationMs > 0, duration: prefs.animationMs },
     };
   };
 
   useEffect(() => {
     if (!el.current) return;
-    api.current = Chessground(el.current, { ...config(), coordinates: true });
+    api.current = Chessground(el.current, { ...config(), coordinates: prefs.coordinates });
     return () => api.current?.destroy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [prefs.coordinates]);
 
   useEffect(() => {
     api.current?.set(config());
     setPromo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fen, orientation, movable, lastMove?.[0], lastMove?.[1], JSON.stringify(arrows), JSON.stringify(highlight)]);
+  }, [fen, orientation, movable, lastMove?.[0], lastMove?.[1], JSON.stringify(arrows), JSON.stringify(highlight), prefs.showDests, prefs.animationMs]);
 
   const pick = (piece: 'q' | 'r' | 'b' | 'n') => {
     if (!promo) return;

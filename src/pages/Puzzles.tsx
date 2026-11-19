@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import { Board } from '../components/Board';
-import { Color, playSound, playUci, toColor } from '../lib/chessUtil';
+import { Color, playUci, toColor } from '../lib/chessUtil';
+import { playSound } from '../lib/sound';
 import { computeStats } from '../lib/model';
 import { addPuzzleAttempt, currentProfile, useStore } from '../lib/store';
 
@@ -33,7 +34,6 @@ type Status = 'loading' | 'opponent' | 'yours' | 'solved' | 'failed';
 
 export function PuzzlesPage() {
   const profile = useStore((s) => currentProfile(s))!;
-  const sound = useStore((s) => s.settings.sound);
   const stats = useMemo(() => computeStats(profile), [profile]);
   const rating = Math.round(stats.puzzle.rating);
   const [all, setAll] = useState<PuzzleRow[] | null>(null);
@@ -90,11 +90,11 @@ export function PuzzlesPage() {
     if (!puzzle || status !== 'opponent') return;
     const t = setTimeout(() => {
       setPly((p) => p + 1);
-      playSound('move', sound);
+      playSound('move');
       setStatus('yours');
     }, ply === 0 ? 700 : 450);
     return () => clearTimeout(t);
-  }, [puzzle, status, ply, sound]);
+  }, [puzzle, status, ply]);
 
   const record = (solved: boolean) => {
     if (recorded.current || !puzzle) return;
@@ -111,19 +111,19 @@ export function PuzzlesPage() {
     const isLast = ply + 1 >= solution.length;
     // Lichess rule: any mating move is accepted.
     if (uci === expected || (test.isCheckmate())) {
-      playSound(test.inCheck() ? 'check' : mv.captured ? 'capture' : 'move', sound);
+      playSound(test.inCheck() ? 'check' : mv.captured ? 'capture' : 'move');
       setHint(null);
       if (isLast) {
         setPly(ply + 1);
         setStatus('solved');
-        playSound('good', sound);
+        playSound('good');
         record(true);
       } else {
         setPly(ply + 1);
         setStatus('opponent');
       }
     } else {
-      playSound('bad', sound);
+      playSound('bad');
       record(false);
       setStatus('failed');
     }

@@ -3,10 +3,12 @@ import { Chess } from 'chess.js';
 import type { Nav } from '../App';
 import { Board } from '../components/Board';
 import { Bot } from '../lib/bot';
-import { BOT_MAX, BOT_MIN, DIFFICULTY_PRESETS, botConfigFor, botTargetFor } from '../lib/botStrength';
+import { BOT_MAX, BOT_MIN, BOT_RD, DIFFICULTY_PRESETS, botConfigFor, botTargetFor } from '../lib/botStrength';
 import { analysisEngine } from '../lib/engine';
-import { Color, gameOverReason, playSound, playUci, soundFor, toColor } from '../lib/chessUtil';
-import { GameRecord, Profile, computeStats, uid } from '../lib/model';
+import { Color, gameOverReason, playUci, soundFor, toColor } from '../lib/chessUtil';
+import { playSound } from '../lib/sound';
+import { GameRecord, Profile, computeStats, ratingConfigOf, uid } from '../lib/model';
+import { previewChanges } from '../lib/rating';
 import { ColorChoice, addGame, currentProfile, getState, updateSettings, useStore } from '../lib/store';
 
 interface ActiveGame {
@@ -124,6 +126,15 @@ function Setup({ profile, onStart, startMoves, forcedColor }: { profile: Profile
         {custom !== null && (
           <input type="range" min={BOT_MIN} max={BOT_MAX} step={25} value={custom} onChange={(e) => setCustom(Number(e.target.value))} />
         )}
+        {rated && !fromOpening && (() => {
+          const c = previewChanges(stats.game, { rating: botRating, rd: BOT_RD }, ratingConfigOf(profile));
+          const f = (x: number) => `${x >= 0 ? '+' : ''}${Math.round(x)}`;
+          return (
+            <p className="muted small">
+              Rating change: win <span className="pos">{f(c.win)}</span> · draw {f(c.draw)} · loss <span className="neg">{f(c.loss)}</span>
+            </p>
+          );
+        })()}
         <div className="bot-line">
           <span className="bot-avatar">🐟</span>
           <div>
@@ -169,7 +180,6 @@ interface Result {
 }
 
 function GameView({ profile, initial, nav, onNewGame }: { profile: Profile; initial: ActiveGame; nav: Nav; onNewGame: () => void }) {
-  const sound = useStore((s) => s.settings.sound);
   const [moves, setMoves] = useState<string[]>(initial.moves);
   const [hintsUsed, setHintsUsed] = useState(initial.hintsUsed);
   const [thinking, setThinking] = useState(false);
@@ -230,7 +240,7 @@ function GameView({ profile, initial, nav, onNewGame }: { profile: Profile; init
     saveActive(profile.id, null);
     const updated = getState().doc.profiles[profile.id];
     const after = computeStats(updated).game.rating;
-    playSound('end', sound);
+    playSound(score === 1 ? 'win' : score === 0 ? 'loss' : 'draw');
     setResult({ score, termination, before, after, gameId: initial.id, rated: record.rated });
   };
 
@@ -251,7 +261,9 @@ function GameView({ profile, initial, nav, onNewGame }: { profile: Profile; init
       const t0 = performance.now();
       await readyRef.current;
       const uci = await botRef.current?.move(fen);
-      const wait = 350 + Math.random() * 400 - (performance.now() - t0);
+      const speed = getState().settings.botSpeed;
+      const base = speed === 'instant' ? 0 : speed === 'slow' ? 1000 + Math.random() * 1500 : 350 + Math.random() * 400;
+      const wait = base - (performance.now() - t0);
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       if (token !== tokenRef.current || !uci) return;
       setThinking(false);
@@ -263,9 +275,9 @@ function GameView({ profile, initial, nav, onNewGame }: { profile: Profile; init
   // Sounds for every new move.
   const prevLen = useRef(moves.length);
   useEffect(() => {
-    if (moves.length > prevLen.current && last) playSound(soundFor(last, chess), sound);
+    if (moves.length > prevLen.current && last) playSound(soundFor(last, chess));
     prevLen.current = moves.length;
-  }, [moves.length, last, chess, sound]);
+  }, [moves.length, last, chess]);
 
   const onUserMove = (uci: string) => {
     if (turn !== humanColor || finishedRef.current) return;
@@ -287,7 +299,7 @@ function GameView({ profile, initial, nav, onNewGame }: { profile: Profile; init
       onNewGame();
       return;
     }
-    if (confirm('Resign this game?')) finish(0, 'resignation');
+    if (!getState().settings.confirmResign || confirm('Resign this game?')) finish(0, 'resignation');
   };
 
   const offerDraw = async () => {

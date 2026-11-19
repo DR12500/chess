@@ -23,3 +23,7 @@ venv/
 
 # Generated: Stockfish copied from node_modules by scripts/copy-engine.mjs
 public/engine/
+
+# Personal secrets
+token.txt
+*.token

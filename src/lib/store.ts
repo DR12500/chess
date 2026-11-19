@@ -4,6 +4,7 @@
  */
 import { useRef, useSyncExternalStore } from 'react';
 import { findOrCreateGist, readGist, writeGist } from './gist';
+import type { RatingConfig } from './rating';
 import {
   GameRecord,
   MAX_PROFILES,
@@ -17,6 +18,8 @@ import {
 } from './model';
 
 export type ColorChoice = 'white' | 'black' | 'random';
+export type SoundSet = 'sfx' | 'piano' | 'nes' | 'futuristic';
+export type BotSpeed = 'instant' | 'natural' | 'slow';
 
 export interface DeviceSettings {
   currentProfileId: string | null;
@@ -24,6 +27,15 @@ export interface DeviceSettings {
   difficultyOffset: number; // bot rating relative to the player's
   colorChoice: ColorChoice;
   sound: boolean;
+  soundSet: SoundSet;
+  volume: number; // 0..1
+  showDests: boolean;
+  coordinates: boolean;
+  animationMs: number;
+  autoQueen: boolean;
+  confirmResign: boolean;
+  botSpeed: BotSpeed;
+  reviewDepth: number;
   sync: { token: string; gistId: string } | null;
 }
 
@@ -65,6 +77,15 @@ const defaultSettings: DeviceSettings = {
   difficultyOffset: 0,
   colorChoice: 'random',
   sound: true,
+  soundSet: 'sfx',
+  volume: 0.7,
+  showDests: true,
+  coordinates: true,
+  animationMs: 180,
+  autoQueen: false,
+  confirmResign: true,
+  botSpeed: 'natural',
+  reviewDepth: 12,
   sync: null,
 };
 
@@ -144,6 +165,28 @@ export function deleteProfile(id: string) {
   if (state.settings.currentProfileId === id) updateSettings({ currentProfileId: activeProfiles(state.doc)[0]?.id ?? null });
 }
 
+export function setRatingConfig(id: string, ratingConfig: RatingConfig) {
+  updateProfile(id, (p) => ({ ...p, ratingConfig, updatedAt: Date.now() }));
+}
+
+export function setStartRating(id: string, startRating: number) {
+  updateProfile(id, (p) => ({ ...p, startRating, updatedAt: Date.now() }));
+}
+
+/** All accounts as JSON, for a manual backup file. */
+export function exportBackup(): string {
+  return JSON.stringify(state.doc, null, 1);
+}
+
+/** Merge a backup file into the current data (never deletes anything). */
+export function importBackup(json: string) {
+  const doc = JSON.parse(json) as SyncDoc;
+  if (!doc || typeof doc !== 'object' || !doc.profiles) throw new Error('Not a Chess Trainer backup file.');
+  setState({ doc: mergeDocs(state.doc, doc) });
+  if (!currentProfile() && activeProfiles(state.doc).length > 0) updateSettings({ currentProfileId: activeProfiles(state.doc)[0].id });
+  scheduleSync();
+}
+
 export function addGame(profileId: string, g: GameRecord) {
   updateProfile(profileId, (p) => ({ ...p, games: [...p.games, g] }));
 }
@@ -202,9 +245,24 @@ export function syncNow(): Promise<void> {
   return syncing;
 }
 
-/** Connect this device. Accepts either a bare token or a "token:gistId" sync code. */
-export async function connectSync(code: string): Promise<void> {
-  const [token, maybeGist] = code.trim().split(':');
+/** Extract "token[:gistId]" from a pasted code or a scanned/opened link (…#sync=<code>). */
+export function parseSyncCode(text: string): string {
+  const t = text.trim();
+  const i = t.indexOf('sync=');
+  return i >= 0 ? decodeURIComponent(t.slice(i + 5).split('&')[0]) : t;
+}
+
+/** Link that opens the app and connects sync (shown as QR code). */
+export function syncLink(): string | null {
+  const s = state.settings.sync;
+  if (!s) return null;
+  return `${location.origin}${location.pathname}#sync=${encodeURIComponent(`${s.token}:${s.gistId}`)}`;
+}
+
+/** Connect this device. Accepts a bare token, a "token:gistId" sync code, or a sync link. */
+export async function connectSync(input: string): Promise<void> {
+  const code = parseSyncCode(input);
+  const [token, maybeGist] = code.split(':');
   if (!token) throw new Error('Please paste a token.');
   const gistId = maybeGist || (await findOrCreateGist(token));
   updateSettings({ sync: { token, gistId } });

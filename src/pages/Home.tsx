@@ -3,6 +3,7 @@ import type { Nav } from '../App';
 import { computeStats } from '../lib/model';
 import { currentProfile, useStore } from '../lib/store';
 import { LESSONS } from '../content/lessons';
+import { InstallCard } from './Settings';
 
 export function HomePage({ nav }: { nav: Nav }) {
   const profile = useStore((s) => currentProfile(s))!;
@@ -13,6 +14,7 @@ export function HomePage({ nav }: { nav: Nav }) {
   return (
     <div className="page">
       <h1>Hi, {profile.name}</h1>
+      <InstallCard />
       <div className="grid stats-row">
         <div className="card stat">
           <span className="muted small">Game rating</span>

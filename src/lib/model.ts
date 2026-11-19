@@ -6,7 +6,7 @@
  * conflict-free: union the records by id, then replay.
  */
 import { BOT_RD } from './botStrength';
-import { Rating, decayRd, newRating, updateRating } from './glicko2';
+import { DEFAULT_RATING_CONFIG, Rating, RatingConfig, decayRd, isProvisional, newRating, updateRating } from './rating';
 
 export const MAX_PROFILES = 3;
 
@@ -35,7 +35,11 @@ export interface Profile {
   games: GameRecord[];
   puzzles: PuzzleAttempt[];
   lessonsDone: string[];
+  /** How ratings are calculated for this account (synced; changing it recalculates history). */
+  ratingConfig?: RatingConfig;
 }
+
+export const ratingConfigOf = (p: Profile): RatingConfig => ({ ...DEFAULT_RATING_CONFIG, ...p.ratingConfig });
 
 export interface SyncDoc {
   version: 1;
@@ -112,7 +116,8 @@ export interface Stats {
 const PUZZLE_RD = 75;
 
 export function computeStats(p: Profile, now = Date.now()): Stats {
-  let game = newRating(p.startRating);
+  const cfg = ratingConfigOf(p);
+  let game = newRating(p.startRating, cfg);
   let lastGameTs = p.createdAt;
   const gameHistory: RatingPoint[] = [{ ts: p.createdAt, rating: game.rating }];
   const gameDelta: Stats['gameDelta'] = {};
@@ -122,20 +127,20 @@ export function computeStats(p: Profile, now = Date.now()): Stats {
     else if (g.score === 0) losses++;
     else draws++;
     if (!g.rated) continue;
-    game = decayRd(game, g.ts - lastGameTs);
+    game = decayRd(game, g.ts - lastGameTs, cfg);
     lastGameTs = g.ts;
     const before = game.rating;
-    game = updateRating(game, { rating: g.botRating, rd: BOT_RD, vol: 0.06 }, g.score);
+    game = updateRating(game, { rating: g.botRating, rd: BOT_RD }, g.score, cfg);
     gameDelta[g.id] = { before, after: game.rating };
     gameHistory.push({ ts: g.ts, rating: game.rating });
   }
-  game = decayRd(game, now - lastGameTs);
+  game = decayRd(game, now - lastGameTs, cfg);
 
-  let puzzle = newRating(p.startRating);
+  let puzzle = newRating(p.startRating, cfg);
   const puzzleHistory: RatingPoint[] = [{ ts: p.createdAt, rating: puzzle.rating }];
   let solved = 0;
   for (const [, ts, pr, ok] of p.puzzles) {
-    puzzle = updateRating(puzzle, { rating: pr, rd: PUZZLE_RD, vol: 0.06 }, ok);
+    puzzle = updateRating(puzzle, { rating: pr, rd: PUZZLE_RD }, ok, cfg);
     if (ok) solved++;
     puzzleHistory.push({ ts, rating: puzzle.rating });
   }
@@ -151,6 +156,6 @@ export function computeStats(p: Profile, now = Date.now()): Stats {
     losses,
     puzzlesSolved: solved,
     puzzlesTried: p.puzzles.length,
-    provisional: game.rd > 110,
+    provisional: isProvisional(game, cfg),
   };
 }

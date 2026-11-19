@@ -24,10 +24,15 @@ The app works offline after the first load.
 
 ## Set up sync (one time)
 
-1. On the first device: Settings → Sync → "create GitHub token". Tick only **gist**, choose *No expiration*, generate, copy.
+1. On the first device: Settings → Sync → "First device: set up sync with GitHub" → create a token. Tick only **gist**, choose *No expiration*, generate, copy.
 2. Paste the token into the app and press **Connect**. A secret Gist is created to hold accounts and games.
-3. Still on that device, press **Show sync code** and copy it (e.g. by e-mailing it to yourself).
-4. On each other device, open the *installed* app → Settings → Sync → paste the sync code → Connect.
+3. Press **Show QR code**.
+4. On each other device, open the *installed* app → Settings (or the welcome screen) → **Scan QR code** and point the camera at it.
+
+## Updates
+
+Every push to `main` is deployed automatically. Installed apps check for a new version on start, when brought back
+to the foreground and every 30 minutes, then show an **Update now** banner (or use Settings → App & updates).
 
 Sync happens automatically after every game/puzzle and when the app is opened. Games played offline sync later.
 
@@ -40,4 +45,4 @@ npm test
 npm run build
 ```
 
-Credits: Stockfish (GPL-3.0) via stockfish.js · chessground (GPL-3.0) · chess.js (BSD-2) · puzzles from the Lichess database (CC0) · cburnett pieces (CC BY-SA 3.0).
+Credits: Stockfish (GPL-3.0) via stockfish.js · chessground (GPL-3.0) · chess.js (BSD-2) · puzzles from the Lichess database (CC0) · sounds by Enigmahack from Lichess (AGPLv3+) · cburnett pieces (CC BY-SA 3.0).

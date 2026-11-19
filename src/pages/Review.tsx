@@ -6,10 +6,9 @@ import { analysisEngine } from '../lib/engine';
 import { Color, toColor, winPercent } from '../lib/chessUtil';
 import { classifyMoves, accuracy, PositionEval, MoveClass } from '../lib/review';
 import { computeStats } from '../lib/model';
-import { currentProfile, useStore } from '../lib/store';
+import { currentProfile, getState, useStore } from '../lib/store';
 import { MoveList } from './Play';
 
-const DEPTH = 12;
 const cacheKey = (id: string) => `chess.review.${id}`;
 
 export function ReviewPage({ nav, gameId }: { nav: Nav; gameId: string }) {
@@ -53,7 +52,7 @@ export function ReviewPage({ nav, gameId }: { nav: Nav; gameId: string }) {
           // Terminal position: mate = lost for the side to move, otherwise draw.
           out.push({ score: ch.isCheckmate() ? -100000 : 0, best: null });
         } else {
-          const r = await eng.search(fen, `depth ${DEPTH}`);
+          const r = await eng.search(fen, `depth ${getState().settings.reviewDepth}`);
           out.push({ score: r.lines[0]?.score ?? 0, best: r.bestmove });
         }
         setProgress((i + 1) / parsed.fens.length);
